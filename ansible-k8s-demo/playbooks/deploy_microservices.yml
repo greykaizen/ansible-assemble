@@ -1,0 +1,45 @@
+---
+# Playbook: Deploy Microservices
+# Purpose: Deploys the Kubernetes manifests for microservices demo
+
+- name: Deploy Microservices to Kubernetes
+  hosts: local
+  become: false
+  vars_files:
+    - ../vars/common.yml
+  gather_facts: yes
+
+  roles:
+    - k8s_deploy_microservices
+
+  post_tasks:
+    - name: Wait for deployments to be ready
+      k8s_info:
+        api_version: apps/v1
+        kind: Deployment
+        namespace: "{{ k8s_namespace }}"
+        name: "{{ item }}"
+      register: deployment_status
+      become: false
+      loop:
+        - "{{ app1_name }}"
+        - "{{ app2_name }}"
+      until: deployment_status.resources[0].status.readyReplicas == deployment_status.resources[0].spec.replicas
+      retries: 30
+      delay: 10
+
+    - name: Get Minikube IP
+      command: minikube ip
+      register: minikube_ip
+      changed_when: false
+      become: false
+
+    - name: Display deployment and access information
+      debug:
+        msg:
+          - "Deployment {{ item.metadata.name }} is ready with {{ item.status.readyReplicas | default(0) }}/{{ item.spec.replicas }} replicas"
+          - "  Access via NodePort: http://{{ minikube_ip.stdout }}:{{ '30080' if item.metadata.name == app1_name else '30081' }}"
+      loop: "{{ deployment_status.results | map(attribute='resources.0') | list }}"
+      loop_control:
+        label: "{{ item.metadata.name }}"
+

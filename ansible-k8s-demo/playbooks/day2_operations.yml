@@ -1,0 +1,56 @@
+---
+# Playbook: Day-2 Operations
+# Purpose: Runs drift-fix roles to restore configuration and services
+
+- name: Day-2 Operations - Configuration Drift Remediation
+  hosts: local
+  become: yes
+  vars_files:
+    - ../vars/common.yml
+  gather_facts: yes
+  # Note: Most tasks need sudo, but kubectl/minikube commands explicitly set become: false
+
+  roles:
+    - firewall_fortinet
+    - service_repair  # Start services first (Docker, Minikube) before DNS needs Minikube IP
+    - cloudflare_dns  # DNS needs Minikube IP, so it must run after service_repair
+    - security_baseline
+
+  post_tasks:
+    - name: Check if kubelet service exists
+      command: systemctl list-unit-files | grep -q kubelet
+      register: kubelet_exists
+      changed_when: false
+      failed_when: false
+      become: false
+
+    - name: Verify Docker service is running
+      systemd:
+        name: docker
+        state: started
+      register: docker_status
+
+    - name: Verify kubelet service is running (if it exists)
+      systemd:
+        name: kubelet
+        state: started
+      register: kubelet_status
+      when: kubelet_exists.rc == 0
+      failed_when: false
+
+    - name: Display service status
+      debug:
+        msg:
+          - "Service docker is {{ docker_status.status.ActiveState }}"
+          - "Service kubelet: {{ 'active' if kubelet_exists.rc == 0 and kubelet_status.status.ActiveState is defined else 'not found (managed by Minikube)' }}"
+
+    - name: Verify Kubernetes cluster connectivity
+      command: kubectl cluster-info
+      register: cluster_info
+      changed_when: false
+      become: false
+
+    - name: Display cluster info
+      debug:
+        msg: "{{ cluster_info.stdout }}"
+

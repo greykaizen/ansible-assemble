@@ -1,0 +1,54 @@
+---
+# Tasks for cloudflare_dns role
+# Local-only DNS simulation using /etc/hosts (no external APIs or tokens).
+
+- name: Check Minikube status
+  command: minikube status
+  register: minikube_status_check
+  changed_when: false
+  failed_when: false
+  become: false
+  when: dns_record_type == "A"
+
+- name: Start Minikube if not running
+  command: minikube start
+  register: minikube_start
+  changed_when: "'Done' in minikube_start.stdout or 'already running' in minikube_start.stderr"
+  failed_when: minikube_start.rc != 0 and "'already running' not in minikube_start.stderr and 'Running' not in minikube_status_check.stdout"
+  become: false
+  when: 
+    - dns_record_type == "A"
+    - minikube_status_check.rc != 0 or "'Running' not in minikube_status_check.stdout"
+
+- name: Get Minikube IP address
+  command: minikube ip
+  register: minikube_ip
+  changed_when: false
+  become: false
+  when: dns_record_type == "A"
+
+- name: Set DNS record name
+  set_fact:
+    dns_record_name: "{{ cloudflare_subdomain }}.{{ cloudflare_domain }}"
+
+- name: Ensure /etc/hosts entry exists for demo hostname
+  lineinfile:
+    path: "{{ local_hosts_file }}"
+    regexp: ".*\\s+{{ dns_record_name }}$"
+    line: "{{ minikube_ip.stdout }} {{ dns_record_name }}"
+    state: present
+    backup: yes
+  when: dns_record_type == "A"
+
+- name: Display local DNS simulation status
+  debug:
+    msg:
+      - "=========================================="
+      - "Local DNS Simulation (no external API)"
+      - "=========================================="
+      - "Hosts file: {{ local_hosts_file }}"
+      - "Record: {{ dns_record_name }}"
+      - "Type: {{ dns_record_type }}"
+      - "Content (Minikube IP): {{ minikube_ip.stdout }}"
+      - "=========================================="
+

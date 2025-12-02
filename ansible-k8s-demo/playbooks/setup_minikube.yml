@@ -1,0 +1,25 @@
+---
+# Playbook: Setup Minikube
+# Purpose: Installs Docker, Minikube, kubectl, and sets up local environment
+
+- name: Setup Minikube Environment
+  hosts: local
+  become: yes
+  vars_files:
+    - ../vars/common.yml
+  gather_facts: yes
+
+  roles:
+    - minikube_install
+
+  # post_tasks:
+  #   - name: Verify Minikube is running
+  #     command: minikube status
+  #     register: minikube_status
+  #     changed_when: false
+  #     become: false
+
+  #   - name: Display Minikube status
+  #     debug:
+  #       msg: "{{ minikube_status.stdout }}"
+

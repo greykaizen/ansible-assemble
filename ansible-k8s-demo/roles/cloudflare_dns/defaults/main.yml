@@ -1,0 +1,13 @@
+---
+# Default variables for cloudflare_dns role
+# NOTE: This role is now local-only and does NOT call Cloudflare or any external API.
+
+cloudflare_domain: "yourdomain.com"
+cloudflare_subdomain: "demo"
+dns_record_type: "A"
+dns_record_ttl: 300
+dns_record_proxied: false
+
+# Local hosts file used to simulate DNS (demo-only)
+local_hosts_file: "/etc/hosts"
+

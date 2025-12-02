@@ -1,0 +1,90 @@
+---
+# Tasks for security_baseline role
+# Enforces Day-2 security settings on the Minikube host
+
+- name: Ensure sysctl settings are configured
+  sysctl:
+    name: "{{ item.key }}"
+    value: "{{ item.value }}"
+    state: present
+    sysctl_set: yes
+    reload: yes
+  loop: "{{ sysctl_settings | dict2items }}"
+
+- name: Ensure sysctl.conf contains required settings
+  lineinfile:
+    path: /etc/sysctl.conf
+    regexp: "^{{ item.key }}"
+    line: "{{ item.key }}={{ item.value }}"
+    state: present
+  loop: "{{ sysctl_settings | dict2items }}"
+
+- name: Create Docker daemon.json directory if it doesn't exist
+  file:
+    path: /etc/docker
+    state: directory
+    mode: '0755'
+
+- name: Ensure Docker daemon.json is configured correctly
+  copy:
+    content: "{{ docker_daemon_config | to_nice_json }}"
+    dest: /etc/docker/daemon.json
+    mode: '0644'
+  notify: restart docker
+
+- name: Ensure Docker socket permissions are correct
+  file:
+    path: /var/run/docker.sock
+    mode: '0666'
+    state: file
+  when: ansible_os_family == "Debian"
+
+- name: Check if auditd is installed
+  command: which auditd
+  register: auditd_check
+  changed_when: false
+  failed_when: false
+  become: false
+
+- name: Install auditd if not present (optional)
+  apt:
+    name: auditd
+    state: present
+  when: auditd_check.rc != 0
+
+- name: Ensure auditd rules are configured
+  lineinfile:
+    path: /etc/audit/rules.d/k8s-security.rules
+    line: "{{ item }}"
+    create: yes
+    mode: '0640'
+  loop: "{{ auditd_rules }}"
+  notify: restart auditd
+  when: auditd_check.rc == 0 or auditd_check is not failed
+
+- name: Verify sysctl settings are applied
+  command: sysctl "{{ item.key }}"
+  register: sysctl_verify
+  changed_when: false
+  loop: "{{ sysctl_settings | dict2items }}"
+
+- name: Display sysctl verification
+  debug:
+    msg: "{{ item.stdout }}"
+  loop: "{{ sysctl_verify.results }}"
+  loop_control:
+    label: "{{ item.item.key }}"
+
+- name: Display security baseline status
+  debug:
+    msg:
+      - "=========================================="
+      - "Security Baseline Applied"
+      - "=========================================="
+      - "✓ sysctl settings configured"
+      - "✓ Docker daemon.json configured"
+      - "✓ Auditd rules configured (if installed)"
+      - ""
+      - "Drift remediation: Security settings restored."
+      - "=========================================="
+

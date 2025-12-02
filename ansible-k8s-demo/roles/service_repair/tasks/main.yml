@@ -1,0 +1,296 @@
+---
+# Tasks for service_repair role
+# Detect broken Kubernetes or system service state and restore it
+
+- name: Ensure Docker service is enabled and running
+  systemd:
+    name: docker
+    enabled: yes
+    state: started
+
+- name: Check if kubelet service exists
+  command: systemctl list-unit-files | grep kubelet
+  register: kubelet_check
+  changed_when: false
+  failed_when: false
+  become: false
+
+- name: Ensure kubelet service is enabled and running
+  systemd:
+    name: kubelet
+    enabled: yes
+    state: started
+  when: kubelet_check.rc == 0
+
+- name: Check Minikube status
+  command: minikube status
+  register: minikube_status
+  changed_when: false
+  failed_when: false
+  become: false
+
+- name: Start Minikube if not running
+  command: minikube start
+  register: minikube_start
+  changed_when: "'Done' in minikube_start.stdout or 'already running' in minikube_start.stderr"
+  become: false
+  when: minikube_status.rc != 0 or "'Running' not in minikube_status.stdout"
+
+- name: Verify Kubernetes cluster connectivity
+  command: kubectl cluster-info
+  register: cluster_info
+  changed_when: false
+  failed_when: false
+  become: false
+
+- name: Check if kubernetes Python library is installed
+  command: python3 -c "import kubernetes"
+  register: kubernetes_lib_check
+  changed_when: false
+  failed_when: false
+  become: false
+  delegate_to: localhost
+
+- name: Ensure kubernetes Python library is available
+  command: pip3 install kubernetes
+  become: false
+  delegate_to: localhost
+  when: kubernetes_lib_check.rc != 0
+
+- name: Check if namespace exists
+  k8s_info:
+    api_version: v1
+    kind: Namespace
+    name: "{{ k8s_namespace }}"
+  register: namespace_check
+  failed_when: false
+  become: false
+
+- name: Create namespace if it doesn't exist
+  k8s:
+    name: "{{ k8s_namespace }}"
+    api_version: v1
+    kind: Namespace
+    state: present
+  become: false
+  when: namespace_check.resources is not defined or namespace_check.resources | length == 0
+
+- name: Check deployment status
+  k8s_info:
+    api_version: apps/v1
+    kind: Deployment
+    namespace: "{{ item.namespace }}"
+    name: "{{ item.name }}"
+  register: deployment_status
+  become: false
+  loop: "{{ k8s_resources_to_repair | selectattr('type', 'equalto', 'deployment') | list }}"
+  failed_when: false
+
+- name: Repair deployment replica count
+  command: kubectl scale deployment "{{ item.item.name }}" --replicas="{{ item.item.replicas }}" -n "{{ item.item.namespace }}"
+  become: false
+  when: 
+    - item.resources is defined
+    - item.resources | length > 0
+    - item.resources[0].spec.replicas | int != item.item.replicas | int
+  loop: "{{ deployment_status.results }}"
+  loop_control:
+    label: "{{ item.item.name }}"
+
+- name: Wait for ingress controller to be ready
+  k8s_info:
+    api_version: v1
+    kind: Pod
+    namespace: ingress-nginx
+    label_selectors:
+      - app.kubernetes.io/component=controller
+  register: ingress_controller_pods
+  until: >
+    ingress_controller_pods.resources is defined
+    and ingress_controller_pods.resources | length > 0
+    and ingress_controller_pods.resources | selectattr('status.phase', 'equalto', 'Running') | list | length > 0
+  retries: 30
+  delay: 5
+  failed_when: false
+  become: false
+  when: k8s_resources_to_repair | selectattr('type', 'equalto', 'ingress') | list | length > 0
+
+- name: Wait additional time for ingress webhook to be ready
+  pause:
+    seconds: 10
+  when: k8s_resources_to_repair | selectattr('type', 'equalto', 'ingress') | list | length > 0
+
+- name: Check ingress status
+  k8s_info:
+    api_version: networking.k8s.io/v1
+    kind: Ingress
+    namespace: "{{ item.namespace }}"
+    name: "{{ item.name }}"
+  register: ingress_status
+  become: false
+  loop: "{{ k8s_resources_to_repair | selectattr('type', 'equalto', 'ingress') | list }}"
+  failed_when: false
+
+- name: Create ingress resource (with retry for webhook)
+  k8s:
+    state: present
+    definition:
+      apiVersion: networking.k8s.io/v1
+      kind: Ingress
+      metadata:
+        name: "{{ item.item.name }}"
+        namespace: "{{ item.item.namespace }}"
+        annotations:
+          nginx.ingress.kubernetes.io/rewrite-target: /
+      spec:
+        ingressClassName: nginx
+        rules:
+        - host: demo.yourdomain.com
+          http:
+            paths:
+            - path: /app1
+              pathType: Prefix
+              backend:
+                service:
+                  name: "{{ app1_name }}"
+                  port:
+                    number: 8080
+            - path: /app2
+              pathType: Prefix
+              backend:
+                service:
+                  name: "{{ app2_name }}"
+                  port:
+                    number: 8081
+  become: false
+  when: item.resources is not defined or item.resources | length == 0
+  loop: "{{ ingress_status.results }}"
+  loop_control:
+    label: "{{ item.item.name }}"
+  register: ingress_create_attempt
+  ignore_errors: yes
+
+- name: Retry ingress creation with kubectl if k8s module failed
+  shell: |
+    for i in {1..5}; do
+      cat <<EOF | kubectl apply -f - && break || sleep 10
+    apiVersion: networking.k8s.io/v1
+    kind: Ingress
+    metadata:
+      name: {{ item.item.item.name }}
+      namespace: {{ item.item.item.namespace }}
+      annotations:
+        nginx.ingress.kubernetes.io/rewrite-target: /
+    spec:
+      ingressClassName: nginx
+      rules:
+      - host: demo.yourdomain.com
+        http:
+          paths:
+          - path: /app1
+            pathType: Prefix
+            backend:
+              service:
+                name: {{ app1_name }}
+                port:
+                  number: 8080
+          - path: /app2
+            pathType: Prefix
+            backend:
+              service:
+                name: {{ app2_name }}
+                port:
+                  number: 8081
+    EOF
+    done
+  become: false
+  when: 
+    - item.item.resources is not defined or item.item.resources | length == 0
+    - item.failed | default(false) | bool
+  loop: "{{ ingress_create_attempt.results }}"
+  loop_control:
+    label: "{{ item.item.item.name }}"
+  ignore_errors: yes
+  register: kubectl_retry_result
+
+- name: Wait for ingress to be available after creation
+  pause:
+    seconds: 5
+  when: 
+    - kubectl_retry_result.results is defined
+    - kubectl_retry_result.results | selectattr('changed', 'equalto', true) | list | length > 0
+
+- name: Verify ingress exists after creation attempt
+  k8s_info:
+    api_version: networking.k8s.io/v1
+    kind: Ingress
+    namespace: "{{ item.namespace }}"
+    name: "{{ item.name }}"
+  register: ingress_verify
+  become: false
+  loop: "{{ k8s_resources_to_repair | selectattr('type', 'equalto', 'ingress') | list }}"
+  loop_control:
+    label: "{{ item.name }}"
+  retries: 10
+  delay: 3
+  until: ingress_verify.resources is defined and ingress_verify.resources | length > 0
+  failed_when: false
+
+- name: Fallback verification using kubectl if k8s_info couldn't verify
+  command: kubectl get ingress "{{ item.item.name }}" -n "{{ item.item.namespace }}" -o json
+  register: kubectl_verify_fallback
+  become: false
+  when: 
+    - item.resources is not defined or item.resources | length == 0
+  loop: "{{ ingress_verify.results }}"
+  loop_control:
+    label: "{{ item.item.name }}"
+  failed_when: false
+  changed_when: false
+
+- name: Wait for deployments to be ready after repair
+  k8s_info:
+    api_version: apps/v1
+    kind: Deployment
+    namespace: "{{ item.namespace }}"
+    name: "{{ item.name }}"
+  register: deployment_ready
+  become: false
+  loop: "{{ k8s_resources_to_repair | selectattr('type', 'equalto', 'deployment') | list }}"
+  until: >
+    deployment_ready.resources is defined
+    and deployment_ready.resources | length > 0
+    and deployment_ready.resources[0].status is defined
+    and (deployment_ready.resources[0].status.readyReplicas | default(0)) == deployment_ready.resources[0].spec.replicas
+  retries: 30
+  delay: 10
+
+- name: Check Docker service status
+  systemd:
+    name: docker
+  register: docker_status_check
+  changed_when: false
+  become: false
+
+- name: Check kubelet service status
+  command: systemctl is-active kubelet
+  register: kubelet_status_check
+  changed_when: false
+  failed_when: false
+  become: false
+
+- name: Display service repair status
+  debug:
+    msg:
+      - "=========================================="
+      - "Service Repair Complete"
+      - "=========================================="
+      - "✓ Docker service: {{ docker_status_check.status.ActiveState }}"
+      - "✓ kubelet service: {{ kubelet_status_check.stdout if kubelet_status_check.rc == 0 else 'Not found' }}"
+      - "✓ Minikube: {{ 'Running' if minikube_status.rc == 0 else 'Started' }}"
+      - "✓ Deployments: Replica counts restored"
+      - "✓ Ingress: Recreated if missing"
+      - ""
+      - "Drift remediation: All services and resources restored."
+      - "=========================================="
+

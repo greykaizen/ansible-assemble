@@ -1,0 +1,103 @@
+---
+# Tasks for minikube_install role
+# Installs Docker, Minikube, kubectl, sets up local environment
+
+- name: Update apt cache
+  apt:
+    update_cache: yes
+    cache_valid_time: 3600
+  when: ansible_os_family == "Debian"
+
+- name: Install required packages
+  apt:
+    name: "{{ required_packages }}"
+    state: present
+  when: ansible_os_family == "Debian"
+
+- name: Install Docker dependencies
+  apt:
+    name:
+      - docker.io
+      - docker-compose
+    state: present
+  when: ansible_os_family == "Debian"
+
+- name: Ensure Docker service is enabled and started
+  systemd:
+    name: docker
+    enabled: yes
+    state: started
+
+- name: Add current user to docker group
+  user:
+    name: "{{ ansible_user_id }}"
+    groups: docker
+    append: yes
+
+- name: Download Minikube binary
+  get_url:
+    url: "https://storage.googleapis.com/minikube/releases/v{{ minikube_version }}/minikube-linux-amd64"
+    dest: /usr/local/bin/minikube
+    mode: '0755'
+  notify: minikube_downloaded
+
+- name: Download kubectl binary
+  get_url:
+    url: "https://dl.k8s.io/release/v{{ kubectl_version }}/bin/linux/amd64/kubectl"
+    dest: /usr/local/bin/kubectl
+    mode: '0755'
+  notify: kubectl_downloaded
+
+- name: Verify Minikube installation
+  command: minikube version
+  register: minikube_version_check
+  changed_when: false
+  become: false
+
+- name: Verify kubectl installation
+  command: kubectl version --client
+  register: kubectl_version_check
+  changed_when: false
+  become: false
+
+- name: Display installed versions
+  debug:
+    msg:
+      - "Minikube: {{ minikube_version_check.stdout }}"
+      - "kubectl: {{ kubectl_version_check.stdout }}"
+
+- name: Check if Minikube is already running
+  command: minikube status
+  register: minikube_status_check
+  changed_when: false
+  failed_when: false
+  become: false
+
+- name: Start Minikube cluster
+  command: >
+    minikube start
+    --driver={{ minikube_driver }}
+    --cpus={{ minikube_cpus }}
+    --memory={{ minikube_memory }}
+  register: minikube_start
+  changed_when: "'Done' in minikube_start.stdout or 'already running' in minikube_start.stderr"
+  failed_when: minikube_start.rc != 0 and "'already running' not in minikube_start.stderr and 'Running' not in minikube_status_check.stdout"
+  become: false
+  when: "'Running' not in minikube_status_check.stdout"
+
+- name: Enable Minikube ingress addon
+  command: minikube addons enable ingress
+  register: ingress_addon
+  changed_when: "'enabled' in ingress_addon.stdout or 'already enabled' in ingress_addon.stdout"
+  become: false
+
+- name: Display Minikube status
+  command: minikube status
+  register: minikube_status
+  changed_when: false
+  become: false
+
+- name: Show Minikube status
+  debug:
+    msg: "{{ minikube_status.stdout_lines }}"
+

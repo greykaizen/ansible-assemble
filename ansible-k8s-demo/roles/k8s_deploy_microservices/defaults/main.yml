@@ -1,0 +1,9 @@
+---
+# Default variables for k8s_deploy_microservices role
+
+k8s_namespace: "demo"
+app1_name: "app1"
+app2_name: "app2"
+app1_replicas: 2
+app2_replicas: 2
+

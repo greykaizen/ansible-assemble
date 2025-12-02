@@ -1,0 +1,9 @@
+---
+# Playbook: Full Demo
+# Purpose: Single entrypoint playbook running ALL steps in logical order
+# Used for stage/demo presentation
+
+- import_playbook: setup_minikube.yml
+
+- import_playbook: deploy_microservices.yml
+

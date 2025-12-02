@@ -1,0 +1,24 @@
+---
+# Variables for local machine setup (Minikube, Docker, packages)
+
+minikube_version: "1.32.0"
+kubectl_version: "1.28.0"
+docker_version: "24.0"
+
+minikube_driver: "docker"
+minikube_cpus: 2
+minikube_memory: "4096"
+
+# Kubernetes cluster configuration
+k8s_namespace: "demo"
+k8s_ingress_class: "nginx"
+
+# System packages
+required_packages:
+  - curl
+  - wget
+  - apt-transport-https
+  - ca-certificates
+  - gnupg
+  - lsb-release
+

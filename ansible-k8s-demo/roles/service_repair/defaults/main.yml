@@ -1,0 +1,28 @@
+---
+# Default variables for service_repair role
+
+k8s_namespace: "demo"
+app1_name: "app1"
+app2_name: "app2"
+app1_replicas: 2
+app2_replicas: 2
+
+# Services to ensure are running
+required_system_services:
+  - docker
+  - kubelet
+
+# Kubernetes resources to repair
+k8s_resources_to_repair:
+  - type: deployment
+    name: "{{ app1_name }}"
+    namespace: "{{ k8s_namespace }}"
+    replicas: "{{ app1_replicas }}"
+  - type: deployment
+    name: "{{ app2_name }}"
+    namespace: "{{ k8s_namespace }}"
+    replicas: "{{ app2_replicas }}"
+  - type: ingress
+    name: demo-ingress
+    namespace: "{{ k8s_namespace }}"
+

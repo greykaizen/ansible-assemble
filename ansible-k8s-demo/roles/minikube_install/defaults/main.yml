@@ -1,0 +1,19 @@
+---
+# Default variables for minikube_install role
+
+minikube_version: "1.32.0"
+kubectl_version: "1.28.0"
+docker_version: "24.0"
+
+minikube_driver: "docker"
+minikube_cpus: 2
+minikube_memory: "4096"
+
+required_packages:
+  - curl
+  - wget
+  - apt-transport-https
+  - ca-certificates
+  - gnupg
+  - lsb-release
+

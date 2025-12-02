@@ -1,0 +1,14 @@
+---
+# Handlers for security_baseline role
+
+- name: restart docker
+  systemd:
+    name: docker
+    state: restarted
+
+- name: restart auditd
+  systemd:
+    name: auditd
+    state: restarted
+  when: ansible_os_family == "Debian"
+

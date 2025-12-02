@@ -1,0 +1,221 @@
+---
+# Tasks for k8s_deploy_microservices role
+# Deploys microservices into the Minikube cluster
+
+- name: Get DOCKER_HOST from minikube docker-env
+  shell: minikube docker-env | grep DOCKER_HOST | cut -d'=' -f2 | tr -d '"' | tr -d "'"
+  register: docker_host_result
+  changed_when: false
+  become: false
+
+- name: Get DOCKER_TLS_VERIFY from minikube docker-env
+  shell: minikube docker-env | grep DOCKER_TLS_VERIFY | cut -d'=' -f2 | tr -d '"' | tr -d "'"
+  register: docker_tls_verify_result
+  changed_when: false
+  become: false
+
+- name: Get DOCKER_CERT_PATH from minikube docker-env
+  shell: minikube docker-env | grep DOCKER_CERT_PATH | cut -d'=' -f2 | tr -d '"' | tr -d "'"
+  register: docker_cert_path_result
+  changed_when: false
+  become: false
+
+- name: Set Minikube Docker environment variables
+  set_fact:
+    minikube_docker_host: "{{ docker_host_result.stdout | trim }}"
+    minikube_docker_tls_verify: "{{ docker_tls_verify_result.stdout | trim }}"
+    minikube_docker_cert_path: "{{ docker_cert_path_result.stdout | trim }}"
+
+- name: Build app1 Docker image using Minikube Docker daemon
+  shell: |
+    cd {{ playbook_dir }}/../microservices/app1
+    docker build -t app1:latest .
+  environment:
+    DOCKER_HOST: "{{ minikube_docker_host }}"
+    DOCKER_TLS_VERIFY: "{{ minikube_docker_tls_verify }}"
+    DOCKER_CERT_PATH: "{{ minikube_docker_cert_path }}"
+  args:
+    chdir: "{{ playbook_dir }}/../microservices/app1"
+
+- name: Build app2 Docker image using Minikube Docker daemon
+  shell: |
+    cd {{ playbook_dir }}/../microservices/app2
+    docker build -t app2:latest .
+  environment:
+    DOCKER_HOST: "{{ minikube_docker_host }}"
+    DOCKER_TLS_VERIFY: "{{ minikube_docker_tls_verify }}"
+    DOCKER_CERT_PATH: "{{ minikube_docker_cert_path }}"
+  args:
+    chdir: "{{ playbook_dir }}/../microservices/app2"
+
+- name: Create namespace if it doesn't exist
+  k8s:
+    name: "{{ k8s_namespace }}"
+    api_version: v1
+    kind: Namespace
+    state: present
+
+- name: Deploy app1 deployment
+  k8s:
+    state: present
+    definition:
+      apiVersion: apps/v1
+      kind: Deployment
+      metadata:
+        name: "{{ app1_name }}"
+        namespace: "{{ k8s_namespace }}"
+        labels:
+          app: "{{ app1_name }}"
+      spec:
+        replicas: "{{ app1_replicas }}"
+        selector:
+          matchLabels:
+            app: "{{ app1_name }}"
+        template:
+          metadata:
+            labels:
+              app: "{{ app1_name }}"
+          spec:
+            containers:
+            - name: "{{ app1_name }}"
+              image: app1:latest
+              imagePullPolicy: IfNotPresent
+              ports:
+              - containerPort: 8080
+                name: http
+              env:
+              - name: APP_NAME
+                value: "{{ app1_name }}"
+              - name: APP_VERSION
+                value: "1.0.0"
+              - name: PORT
+                value: "8080"
+              resources:
+                requests:
+                  memory: "64Mi"
+                  cpu: "100m"
+                limits:
+                  memory: "128Mi"
+                  cpu: "200m"
+
+- name: Deploy app2 deployment
+  k8s:
+    state: present
+    definition:
+      apiVersion: apps/v1
+      kind: Deployment
+      metadata:
+        name: "{{ app2_name }}"
+        namespace: "{{ k8s_namespace }}"
+        labels:
+          app: "{{ app2_name }}"
+      spec:
+        replicas: "{{ app2_replicas }}"
+        selector:
+          matchLabels:
+            app: "{{ app2_name }}"
+        template:
+          metadata:
+            labels:
+              app: "{{ app2_name }}"
+          spec:
+            containers:
+            - name: "{{ app2_name }}"
+              image: app2:latest
+              imagePullPolicy: IfNotPresent
+              ports:
+              - containerPort: 8081
+                name: http
+              env:
+              - name: APP_NAME
+                value: "{{ app2_name }}"
+              - name: APP_VERSION
+                value: "1.0.0"
+              - name: PORT
+                value: "8081"
+              resources:
+                requests:
+                  memory: "64Mi"
+                  cpu: "100m"
+                limits:
+                  memory: "128Mi"
+                  cpu: "200m"
+
+- name: Deploy app1 service (NodePort)
+  k8s:
+    state: present
+    definition:
+      apiVersion: v1
+      kind: Service
+      metadata:
+        name: "{{ app1_name }}"
+        namespace: "{{ k8s_namespace }}"
+        labels:
+          app: "{{ app1_name }}"
+      spec:
+        type: NodePort
+        ports:
+        - port: 8080
+          targetPort: 8080
+          nodePort: 30080
+          protocol: TCP
+          name: http
+        selector:
+          app: "{{ app1_name }}"
+
+- name: Deploy app2 service (NodePort)
+  k8s:
+    state: present
+    definition:
+      apiVersion: v1
+      kind: Service
+      metadata:
+        name: "{{ app2_name }}"
+        namespace: "{{ k8s_namespace }}"
+        labels:
+          app: "{{ app2_name }}"
+      spec:
+        type: NodePort
+        ports:
+        - port: 8081
+          targetPort: 8081
+          nodePort: 30081
+          protocol: TCP
+          name: http
+        selector:
+          app: "{{ app2_name }}"
+
+- name: Deploy ingress
+  k8s:
+    state: present
+    definition:
+      apiVersion: networking.k8s.io/v1
+      kind: Ingress
+      metadata:
+        name: demo-ingress
+        namespace: "{{ k8s_namespace }}"
+        annotations:
+          nginx.ingress.kubernetes.io/rewrite-target: /
+      spec:
+        ingressClassName: nginx
+        rules:
+        - host: "{{ ingress_hostname | default('demo.yourdomain.com') }}"
+          http:
+            paths:
+            - path: /app1
+              pathType: Prefix
+              backend:
+                service:
+                  name: "{{ app1_name }}"
+                  port:
+                    number: 8080
+            - path: /app2
+              pathType: Prefix
+              backend:
+                service:
+                  name: "{{ app2_name }}"
+                  port:
+                    number: 8081
+
+# Note: Deployment readiness check is handled in the playbook's post_tasks
+

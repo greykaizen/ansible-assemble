@@ -1,0 +1,27 @@
+---
+# Global or shared variables
+
+# Domain configuration
+domain_name: "yourdomain.com"
+ingress_hostname: "demo.yourdomain.com"
+
+# Microservices configuration
+app1_name: "app1"
+app2_name: "app2"
+app1_replicas: 2
+app2_replicas: 2
+app1_port: 8080
+app2_port: 8081
+
+# Firewall rule definitions
+firewall_rules:
+  - name: "k8s-api-server"
+    port: 6443
+    protocol: "tcp"
+    action: "allow"
+  - name: "k8s-nodeport-range"
+    port_start: 30000
+    port_end: 32767
+    protocol: "tcp"
+    action: "allow"
+

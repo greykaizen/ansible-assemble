@@ -1,0 +1,19 @@
+---
+# Variables for DNS & Firewall hosts (local demo-only)
+
+# DNS configuration (used for local /etc/hosts simulation)
+cloudflare_domain: "yourdomain.com"
+cloudflare_subdomain: "demo"
+
+# Firewall rules for Kubernetes (used by local ufw)
+k8s_required_ports:
+  - port: 6443
+    protocol: tcp
+    description: "Kubernetes API Server"
+  - port: 30000
+    protocol: tcp
+    description: "NodePort Services (start)"
+  - port: 32767
+    protocol: tcp
+    description: "NodePort Services (end)"
+

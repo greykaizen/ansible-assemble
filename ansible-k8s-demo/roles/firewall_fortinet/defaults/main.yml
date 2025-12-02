@@ -1,0 +1,19 @@
+---
+# Default variables for firewall_fortinet role
+# NOTE: This role is now 100% local-only (no external API, no tokens).
+
+# Firewall rules for Kubernetes (local ufw/iptables)
+k8s_required_ports:
+  - port: 6443
+    protocol: tcp
+    description: "Kubernetes API Server"
+  - port: 30000
+    protocol: tcp
+    description: "NodePort Services (start)"
+  - port: 32767
+    protocol: tcp
+    description: "NodePort Services (end)"
+
+# Use local firewall (ufw/iptables) for demo
+use_local_firewall: true
+

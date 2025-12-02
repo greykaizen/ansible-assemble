@@ -1,0 +1,11 @@
+---
+# Handlers for minikube_install role
+
+- name: minikube_downloaded
+  debug:
+    msg: "Minikube binary downloaded successfully"
+
+- name: kubectl_downloaded
+  debug:
+    msg: "kubectl binary downloaded successfully"
+

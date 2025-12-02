@@ -1,0 +1,25 @@
+---
+# Default variables for security_baseline role
+
+# sysctl settings
+sysctl_settings:
+  net.ipv4.ip_forward: 1
+  net.bridge.bridge-nf-call-iptables: 1
+  net.bridge.bridge-nf-call-ip6tables: 1
+  vm.swappiness: 1
+  vm.overcommit_memory: 1
+
+# Docker daemon configuration
+docker_daemon_config:
+  log-driver: "json-file"
+  log-opts:
+    max-size: "10m"
+    max-file: "3"
+  storage-driver: "overlay2"
+
+# Auditd rules (if auditd is installed)
+auditd_rules:
+  - "-w /etc/passwd -p wa -k passwd_changes"
+  - "-w /etc/group -p wa -k group_changes"
+  - "-w /etc/shadow -p wa -k shadow_changes"
+
