@@ -1,6 +1,19 @@
 # Ansible
 *.retry
 .vault_pass
+.vault_pass.txt
+*.vault
+.vault/
+ansible.log
+ansible.log.*
+*.ansible.log
+.ansible/
+retry/
+*.retry.*
+host_vars/*/vault.yml
+group_vars/*/vault.yml
+**/vault.yml
+**/*_vault.yml
 
 # Python
 __pycache__/
@@ -8,25 +21,297 @@ __pycache__/
 *$py.class
 *.so
 .Python
+build/
+develop-eggs/
+dist/
+downloads/
+eggs/
+.eggs/
+lib/
+lib64/
+parts/
+sdist/
+var/
+wheels/
+share/python-wheels/
+*.egg-info/
+.installed.cfg
+*.egg
+MANIFEST
+pip-log.txt
+pip-delete-this-directory.txt
+.pytest_cache/
+.coverage
+.coverage.*
+htmlcov/
+.tox/
+.nox/
+.hypothesis/
+.pytype/
+cython_debug/
+*.pyc
+*.pyo
+*.pyd
+.Python
+*.so
+*.egg
+*.egg-info/
+.eggs/
+dist/
+build/
+*.manifest
+*.spec
+pip-log.txt
+pip-delete-this-directory.txt
+
+# Virtual Environments
 env/
 venv/
 ENV/
+env.bak/
+venv.bak/
+myvenv/
+.venv/
+virtualenv/
+.virtualenv/
+*.virtualenv
 
-# IDE
+# Docker
+*.dockerignore
+.docker/
+docker-compose.override.yml
+.dockerignore.local
+
+# Kubernetes
+*.kubeconfig
+kubeconfig
+.kube/
+*.kubeconfig.*
+*.k8s.local
+
+# IDE - Visual Studio Code
 .vscode/
+*.code-workspace
+.history/
+
+# IDE - PyCharm / IntelliJ IDEA
 .idea/
+*.iml
+*.iws
+*.ipr
+out/
+
+# IDE - Vim
 *.swp
 *.swo
 *~
+.vim/
+Session.vim
+.netrwhist
 
-# OS
+# IDE - Emacs
+*~
+\#*\#
+/.emacs.desktop
+/.emacs.desktop.lock
+*.elc
+auto-save-list
+tramp
+.\#*
+
+# IDE - Sublime Text
+*.sublime-project
+*.sublime-workspace
+
+# IDE - Eclipse
+.project
+.classpath
+.settings/
+bin/
+tmp/
+*.tmp
+*.bak
+*.swp
+*~.nib
+local.properties
+.loadpath
+.recommenders
+
+# OS - macOS
 .DS_Store
+.AppleDouble
+.LSOverride
+Icon
+._*
+.DocumentRevisions-V100
+.fseventsd
+.Spotlight-V100
+.TemporaryItems
+.Trashes
+.VolumeIcon.icns
+.com.apple.timemachine.donotpresent
+.AppleDB
+.AppleDesktop
+Network Trash Folder
+Temporary Items
+.apdisk
+
+# OS - Windows
 Thumbs.db
+Thumbs.db:encryptable
+ehthumbs.db
+ehthumbs_vista.db
+*.stackdump
+[Dd]esktop.ini
+$RECYCLE.BIN/
+*.cab
+*.msi
+*.msix
+*.msm
+*.msp
+*.lnk
+
+# OS - Linux
+*~
+.fuse_hidden*
+.directory
+.Trash-*
+.nfs*
 
 # Logs
 *.log
+*.log.*
+logs/
+*.out
+*.err
+*.trace
 
 # Temporary files
 *.tmp
+*.temp
 *.bak
+*.backup
+*.old
+*.orig
+*.save
+*.swp
+*.swo
+*~
+.cache/
 
+# Environment variables and secrets
+.env
+.env.local
+.env.*.local
+*.env
+.envrc
+.secrets
+secrets.yml
+secrets.yaml
+*.pem
+*.key
+*.crt
+*.cert
+id_rsa
+id_rsa.pub
+*.p12
+*.pfx
+*.jks
+
+# Build artifacts
+*.tar.gz
+*.zip
+*.rar
+*.7z
+target/
+out/
+build/
+dist/
+
+# Testing
+.pytest_cache/
+.coverage
+.coverage.*
+htmlcov/
+.tox/
+.nox/
+.hypothesis/
+test-results/
+junit.xml
+coverage.xml
+*.cover
+.hypothesis/
+
+# Jupyter Notebook
+.ipynb_checkpoints
+*.ipynb
+
+# pyenv
+.python-version
+
+# Celery
+celerybeat-schedule
+celerybeat.pid
+
+# SageMath
+*.sage.py
+
+# Spyder
+.spyderproject
+.spyproject
+
+# Rope
+.ropeproject
+
+# mkdocs
+/site
+
+# mypy
+.mypy_cache/
+.dmypy.json
+dmypy.json
+
+# Pyre
+.pyre/
+
+# pytype
+.pytype/
+
+# Cython
+cython_debug/
+
+# Ansible Galaxy
+ansible-galaxy-requirements.yml.bak
+
+# Terraform (if used)
+*.tfstate
+*.tfstate.*
+.terraform/
+.terraform.lock.hcl
+*.tfvars
+*.tfvars.json
+
+# Packer (if used)
+packer_cache/
+*.box
+
+# Vagrant (if used)
+.vagrant/
+Vagrantfile.local
+
+# Minikube
+.minikube/
+
+# Helm (if used)
+*.tgz
+charts/*.tgz
+
+# Local configuration overrides (but not inventory/group_vars/local.yml which is tracked)
+*_local.yml
+*_local.yaml
+.local.yml
+.local.yaml
+config.local.*
+*.local.*
+local_config.yml
+local_config.yaml
